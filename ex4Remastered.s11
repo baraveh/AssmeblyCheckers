@@ -1,0 +1,2713 @@
+	TKS = 177560
+	TKB = 177562
+	TPS = 177564
+	TPB = 177566
+	CLS = 177546
+	cr = 15
+	lf = 12
+
+;EMT trap vector
+.=torg+30
+.word emtrap
+.word 240 
+
+
+;keyboard
+.=torg+60
+.word echo 
+.word 200 ; priority 4
+
+
+;clock
+.=torg+100
+.word clock
+.word 300 ;priority 6
+
+
+.= torg +2000
+
+main: mov #main, sp
+bis #101, @#TKS
+
+
+mov #welcome, -(sp)
+jsr pc, print
+tst (sp)+
+
+jsr pc, endl
+
+mov #dollar, -(sp)
+jsr pc, print
+tst (sp)+
+
+busyWait: cmp InGame, #0
+		beq busyWait ; waiting for intial start
+				
+
+jsr pc, printboard
+				
+cmp Player, #1
+beq .+6
+jmp Bturn
+;----------------------
+;white turn
+
+cmp InGame, #0 ; in case a stop was made
+bne .+6
+jmp busyWait
+
+;-----------------------
+;checking win/loss/tie
+mov r4, -(sp)
+
+mov #Board, -(sp)
+mov #1, -(sp)
+jsr pc, calcWP
+tst (sp)+
+tst (sp)+
+cmp r4, #20
+beq WWin
+cmp r4, #0
+beq WchkTie
+
+mov #Board, -(sp)
+mov #2, -(sp)
+jsr pc, calcWP
+tst (sp)+
+tst (sp)+
+cmp r4, #20
+beq WLoss
+
+tst (sp)+
+tst (sp)+
+mov (sp)+, r4
+jmp Wturn
+;------
+;is win
+WWin: mov #whitewin, -(sp)
+jsr pc, print
+tst (sp)+
+
+jsr pc, endl
+
+mov #dollar, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov #0, InGame
+jmp busyWait
+;------
+;is tie
+WchkTie: mov #Board, -(sp)
+	mov #1, -(sp)
+	jsr pc, NumMoves
+	cmp r3, #0
+	bne Wturn
+	;----- if White has no moves, we check moves for Black. if black has moves but white doesn't, we skip the turn
+	mov #Board, -(sp)
+	mov #2, -(sp)
+	jsr pc, NumMoves
+	cmp r3, #0
+	bne .+6
+	jmp TieEnd
+	
+	mov #2, Player ; switiching the turn to black
+	jmp busyWait
+;----------
+WLoss: mov #blackwin, -(sp)
+		jsr pc, print
+		tst (sp)+
+		jsr pc, endl
+		mov #dollar, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov #0, InGame
+jmp busyWait
+		
+	
+;------------------------------
+Wturn: 
+
+mov #currPri, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov #WColor, -(sp)
+jsr pc, print
+tst (sp)+
+
+cmp WhiteP+2, #0 ; check whether white is human or comp
+bne .+8
+mov #humPri, -(sp)
+br .+6
+mov #compPri, -(sp)
+jsr pc, print
+tst (sp)+
+
+jsr pc, endl
+
+mov #dollar, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov #0, timerdeci
+mov TimeW, timersec ;start to count time
+mov #100, @#CLS
+
+cmp WhiteP+2, #0
+beq WhumTurn
+jsr pc, ComTurn ;player is computer, go to computer function
+jmp busyWait
+
+;----------------
+WhumTurn: cmp InGame, #0 ;a stop was made
+	bne .+6
+	jmp busyWait
+	
+	;turn was done
+	cmp Player, #1
+	beq .+6
+	jmp busyWait
+	
+	;waiting until time is up or a turn was made
+	cmp timersec, #0
+	bne WhumTurn
+	cmp timerdeci, #0
+	bne WhumTurn
+	;out of time
+	mov #overwhite, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	jsr pc, endl
+	
+	mov #dollar, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	mov #0, InGame
+	jmp busyWait
+		
+;-----------
+;black turn
+Bturn: cmp InGame, #0
+bne .+6
+jmp busyWait
+
+;-----------------------
+;checking win/loss/tie
+mov r4, -(sp)
+mov #Board, -(sp)
+mov #2, -(sp)
+jsr pc, calcWP
+tst (sp)+
+tst (sp)+
+cmp r4, #20
+beq BWin
+cmp r4, #0
+beq BchkTie
+
+mov #Board, -(sp)
+mov #1, -(sp)
+jsr pc, calcWP
+tst (sp)+
+tst (sp)+
+cmp r4, #20
+beq BLoss
+
+tst (sp)+
+tst (sp)+
+mov (sp)+, r4
+jmp Bturn1
+;------
+;is win
+BWin: mov #blackwin, -(sp)
+jsr pc, print
+tst (sp)+
+
+jsr pc, endl
+
+mov #dollar, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov #0, InGame
+jmp busyWait
+;------
+;is tie
+BchkTie: mov #Board, -(sp)
+	mov #2, -(sp)
+	jsr pc, NumMoves
+	cmp r3, #0
+	bne Bturn1
+	;----- if White has no moves, we check moves for Black. if black has moves but white doesn't, we skip the turn
+	mov #Board, -(sp)
+	mov #1, -(sp)
+	jsr pc, NumMoves
+	cmp r3, #0
+	bne .+6
+	jmp TieEnd
+	
+	mov #2, Player ; switiching the turn to black
+	jmp busyWait
+;----------
+BLoss: mov #whitewin, -(sp)
+		jsr pc, print
+		tst (sp)+
+		jsr pc, endl
+		mov #dollar, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov #0, InGame
+jmp busyWait
+
+;----------------------------
+
+Bturn1: mov #currPri, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov #BColor, -(sp)
+jsr pc, print
+tst (sp)+
+
+cmp BlackP+2, #0 ; check whether black is human or comp
+bne .+8
+mov #humPri, -(sp)
+br .+6
+mov #compPri, -(sp)
+jsr pc, print
+tst (sp)+
+
+jsr pc, endl
+
+mov #dollar, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov #0, timerdeci
+mov TimeB, timersec
+
+mov #100, @#CLS
+
+cmp BlackP+2, #0
+beq BhumTurn
+jsr pc, ComTurn
+jmp busyWait
+
+;---------------------------------
+
+BhumTurn: cmp InGame, #0 ;a stop was made
+	bne .+6
+	jmp busyWait
+	
+	;turn was done
+	cmp Player, #2
+	beq .+6
+	jmp busyWait
+	
+	;waiting until time is up or a turn was made
+	cmp timersec, #0
+	bne BhumTurn
+	cmp timerdeci, #0
+	bne BhumTurn
+	
+	;out of time
+	mov #overblack, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	jsr pc, endl
+	
+	mov #dollar, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	mov #0, InGame
+	jmp busyWait
+	
+	
+TieEnd: mov #printie , -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	jsr pc, endl
+	
+	mov #dollar, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	mov #0, InGame
+	jmp busyWait
+
+;--------------------------------
+emtrap: mov (sp), -(sp) ;get caller's pc
+		sub #2, (sp) ;calculate emt addresss
+		mov @0(sp), (sp) ; get emt machine code
+		bic #177400, (sp) ; get service number
+		asl (sp) ; calculate service addresss
+		add #emtable, (sp)
+		mov @0(sp), (sp)
+		mov r0, -(sp)
+		mov r1, -(sp)
+		mov r2, -(sp)
+		mov r3, -(sp)
+		mov r4, -(sp)
+		mov r5, -(sp)
+		mov 12.(sp), -(sp)
+		jmp @(sp)+ 
+		
+	;jump table for emt services
+
+emtable: .word emt00 ; address of start
+		.word emt01 ; address of stop
+		.word emt02 ; address of move
+		.word emt03 ; address of time
+		.word emt04 ; illegal command
+		.word emt05 ;command decipher
+
+;-------------------------------------------------
+
+;Start
+;Buffer: |s|t|a|r|t| |h| |3|0| |c| |5|enter
+emt00: 
+	cmp InGame, #0
+	beq .+6
+	jmp emt04
+	mov #Buffer+10, r4
+	
+pl1Find: add #2, r4
+		cmpb (r4), #40 ;skipping spaces
+		beq pl1Find
+	;r4 points at the first argument
+	
+	cmpb (r4), #150 ;checking if player one is a computer or an human - ascii for h
+	bne whiPC
+	mov #0, WhiteP+2 ;we mark 0 for human, 1 for computer
+	jmp arg2
+
+whiPC:	cmpb (r4), #143 ; ascii for c
+	beq .+6
+	jmp emt04
+	mov #1, WhiteP+2
+	
+	;finished first argument
+arg2:add #2, r4
+	cmp (r4), #40 ; checking for space after argument
+	beq t1Find
+	jmp emt04
+	
+t1Find: add #2, r4
+	cmpb (r4), #40
+	beq t1Find
+	;r4 now points at the second argument
+	
+	clr r0
+	clr r1
+	
+t1loop: mul #10., r1
+	cmpb (r4), #60
+	bhis .+6
+	jmp emt04
+	cmpb (r4), #71
+	blos .+6
+	jmp emt04
+	mov (r4), r2
+	bic #177760, r2
+	add r2, r1
+	add #2, r4
+	cmpb (r4), #40 ; checking if we finished the argument
+	bne t1loop
+
+mov r1, TimeW
+
+;----- player 2, time for player 2
+
+pl2loop: add #2, r4
+	cmpb (r4), #40
+	beq pl2loop
+	
+	;r4 now points at the third argument
+	
+	cmpb (r4), #150 ;checking if player two is a computer or an human - ascii for h
+	bne blaPC
+	mov #0, BlackP+2 ;we mark 0 for human, 1 for computer
+	jmp t2Find
+
+blaPC:	cmpb (r4), #143 ; ascii for c
+	beq .+6
+	jmp emt04
+	mov #1, BlackP+2
+
+t2Find: add #2, r4
+	cmpb (r4), #40
+	beq t2Find
+
+	clr r0
+	clr r1
+
+	
+t2loop: mul #10., r1
+	cmpb (r4), #60
+	bhis .+6
+	jmp emt04
+	cmpb (r4), #71
+	blos .+6
+	jmp emt04
+	mov (r4), r2
+	bic #177760, r2
+	add r2, r1
+	add #2, r4
+	cmpb (r4), #15 ;in case the argument ends with enter
+	beq .+8
+	cmpb (r4), #40 ; checking if we finished the argument
+	bne t2loop
+
+mov r1, TimeB
+	
+mov #64., r0
+mov #deBoard, r1
+mov #Board, r2
+
+;setting the board to be the starting board
+SetBo: mov (r1), (r2)
+	tst (r1)+
+	tst (r2)+
+	sob r0, SetBo
+
+; printing required messages
+mov #staPri, -(sp)
+jsr pc, print
+tst (sp)+
+
+jsr pc, endl
+
+mov #WColor, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov #staPri1, -(sp)
+jsr pc, print
+tst (sp)+
+
+cmp WhiteP+2, #0 ; check whether white is human or comp
+bne .+8
+mov #humPri, -(sp)
+br .+6
+mov #compPri, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov #staPri2, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov TimeW, r0
+jsr pc, printnum
+
+mov #staPri3, -(sp)
+jsr pc, print
+tst (sp)+
+
+jsr pc, endl
+mov #BColor, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov #staPri1, -(sp)
+jsr pc, print
+tst (sp)+
+
+cmp BlackP+2, #0 ; check whether white is human or comp
+bne .+8
+mov #humPri, -(sp)
+br .+6
+mov #compPri, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov #staPri2, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov TimeB, r0
+jsr pc, printnum
+
+mov #staPri3, -(sp)
+jsr pc, print
+tst (sp)+
+
+jsr pc, endl
+
+
+;starting the game
+mov #1, Player
+mov #1, InGame
+
+	
+mov (sp)+, r5
+mov (sp)+, r4
+mov (sp)+, r3
+mov (sp)+, r2
+mov (sp)+, r1
+mov (sp)+, r0
+tst (sp)+
+
+	rti
+
+;-------------------------------------------------	
+
+;Stop 
+
+emt01:
+		;Added a check whether the command is valid
+		cmpb Buffer+8., #15 ; ascii for enter 
+		beq .+16
+		cmpb Buffer+8., #40 ; ascii for space
+		beq .+6
+		jmp emt04
+		cmp InGame, #1
+		beq .+6
+		jmp emt04
+		;--------------------------
+			mov #Board, -(sp) ;push board to stack
+			mov Player, -(sp) ;push current player to stack
+			jsr pc, calcWP ;result returns in r4
+			tst (sp)+;popping paramters
+			tst (sp)+
+			mov #stopwwp, -(sp) ;pop WP for string to stack
+			jsr pc, print
+			tst (sp)+ ;pop string
+			cmp Player,#1 ;check if current player is white
+			bne blisprint
+			mov #wis,-(sp);set of commands to print the WP message
+			jsr pc, print
+			tst (sp)+
+			br printwp ;skip over "black player is"
+blisprint:	mov #blis,-(sp) ;blis  is the label for "black player is"
+			jsr pc, print
+			tst (sp)+
+printwp:	mov r4,r0
+			jsr pc,printnum
+			jsr pc,endl
+
+			cmp r4,#0 ;check if wp is 0
+			beq tie
+			cmp r4,#0
+			bgt currwin ;current player has won (positive WP)
+			cmp Player,#1 ;if we got here the current player lost
+			bne wwin ;if current player is not white, it means white has won, ohterwise black has won.
+			mov #blackwin,-(sp)
+			jsr pc, print
+			tst (sp)+
+			br endstop
+wwin:		mov #whitewin,-(sp)
+			jsr pc, print
+			tst (sp)+
+			br endstop
+		
+		
+tie:		mov #printie,-(sp)
+			jsr pc,print
+			tst (sp)+
+			br endstop
+			
+currwin:	cmp Player,#1
+			bne bwin
+			mov #whitewin,-(sp)
+			jsr pc, print
+			tst (sp)+
+			br endstop
+bwin:		mov #blackwin,-(sp)
+			jsr pc, print
+			tst (sp)+
+			br endstop
+			
+
+
+			
+endstop: jsr pc, endl
+		
+mov #dollar, -(sp)
+jsr pc, print
+tst (sp)+
+
+	mov #0,InGame
+	mov (sp)+, r5
+	mov (sp)+, r4
+	mov (sp)+, r3
+	mov (sp)+, r2
+	mov (sp)+, r1
+	mov (sp)+, r0
+	tst (sp)+
+	rti
+	
+	
+;--------------------------------------------------
+
+;Move
+
+emt02: 
+	cmp InGame, #1 ;if we aren't in an active game move is illegal
+	beq .+6 
+	jmp emt04 
+	;|m|o|v|e| |0|1| |1|0|enter
+	cmpb Buffer+8, #40 ;cmp space
+	beq .+6
+	jmp emt04
+	
+	mov #Buffer+8, r4
+	
+arg1F: add #2, r4
+	cmpb (r4), #40
+	beq arg1F
+	
+	cmpb (r4), #67 ;ascii code for 7
+	blos .+6
+	jmp emt04
+	cmpb (r4), #60 ;ascii code for 0
+	bhis .+6
+	jmp emt04
+
+	
+	clr r1
+	movb (r4), r1
+	bic #177760, r1 ; r1 now has the tens num in octal. since it is the tens num it can't be more than 7 (64 = 200)
+	;add a check that r1 is between 0 to 6
+	mul #8., r1 ; the number should be in the tens bit, so we multiply by 8
+	
+	
+	clr r2
+	add #2, r4
+	
+	mov (r4), r2
+	cmpb r2, #67 ; ascii code for 7
+	blos .+6
+	jmp emt04
+	cmpb r2, #60 ; ascii code for 0
+	bhis .+6
+	jmp emt04
+	
+	
+	bic #177760, r2 ;r2 now has the lsb
+	add r2, r1 ; r1 now has src
+	
+	add #2, r4
+
+;Second Argument
+	cmpb (r4), #40 ;checking space
+	beq .+6
+	jmp emt04
+
+
+arg2F: add #2, r4
+	cmpb (r4), #40
+	beq arg2F
+
+	mov (r4), r3
+	cmpb r3, #67 ;ascii code for 7
+	blos .+6
+	jmp emt04
+	cmpb r3, #60 ;ascii code for 0
+	bhis .+6
+	jmp emt04
+	bic #177760, r3
+	mul #8., r3
+	
+	clr r2
+	add #2, r4
+	
+	mov (r4), r2
+	cmpb r2, #67 ; ascii code for 7
+	blos .+6
+	jmp emt04
+	cmpb r2, #60 ; ascii code for 0
+	bhis .+6
+	jmp emt04
+	bic #177760, r2
+	;add a check that r2 is between 0 to 9
+	add r2, r3
+	
+	clr r0
+	clr r2
+	;r1 has src, r3 has dst
+	
+	mul #2, r1
+	mul #2, r3
+	
+	;we need the number of words, not slots, so multiply by 2
+	
+	add #Board, r1
+	add #Board, r3
+	
+	;r1 and r3 now have the src and dst addresses
+	
+	cmp (r1), Player ;checking to see that dst contains a piece of the player
+	beq .+6 
+	jmp emt04
+	
+	mov r3, r2
+	sub r1, r2 ; r2 contains the difference between src and dst
+	
+	mov r1, r5
+	sub #Board, r5
+	
+	cmp (r1), #1
+	beq WV ; white valid
+	
+	;checking valid move for black
+	;------------
+	;last line
+ ;r5 contains the distance of src from the beginning of the board
+	cmp r5, #112. ;piece is on the last line and can't move 
+	blo .+6
+	jmp emt04
+	clr r4
+	div #20, r4
+	;------------------------------
+	cmp r2, #18. ;moving right
+	bne mBleft
+	cmp r5, #14. ;checking to see that the src isn't on a corner
+	bne .+6
+	jmp emt04
+	cmp (r3), #0 ;checking to see that the tile is free
+	bne .+6
+	jmp	Valid
+	jmp emt04
+	;------
+mBleft:	cmp r2, #14. ;moving left
+	bne mBrE	
+	cmp r5, #0 ; checking to see this isn't a corner
+	bne .+6
+	jmp emt04
+	cmp (r3), #0
+	bne .+6 
+	jmp Valid
+	jmp emt04
+	;------
+mBrE:cmp r2, #36. ;eating right
+	bne mBlE
+	cmp r5, #12.
+	blo .+6
+	jmp emt04
+	cmp 18.(r1), #0
+	bne .+6
+	jmp emt04
+	cmp 18.(r1), Player
+	bne .+6
+	jmp emt04
+	cmp (r3), #0
+	bne .+6
+	jmp	Valid
+	jmp emt04
+	;-------
+mBlE:cmp r2, #28. ;eating left
+	beq .+6
+	jmp emt04
+	cmp r5, #2
+	bhi .+6 
+ jmp emt04
+	cmp 14.(r1), #0
+	bne .+6 
+ jmp emt04
+	cmp 14.(r1), Player
+	bne .+6 
+ jmp emt04
+	cmp (r3), #0
+	beq Valid
+	jmp emt04
+	;-----
+	
+WV:	 ;--------------
+	;last row
+	cmp r5, #14.
+	bhi .+6 
+ jmp emt04
+	clr r4
+	div #20, r4
+	;--------
+	;moving right
+	cmp r2, #-14.
+	bne mWleft
+	cmp r5, #14.
+	bne .+6 
+ jmp emt04
+	cmp (r3), #0
+	beq Valid
+	jmp emt04
+	;------------
+	;moving left
+mWleft:	cmp r2, #-18.
+	bne mWrE
+	cmp r5, #0
+	bne .+6 
+ jmp emt04
+	cmp (r3), #0
+	beq Valid
+	jmp emt04
+	;-------------------
+	;eating right
+mWrE: cmp r2, #-28.
+	bne mWlE
+	cmp r5, #12.
+	blo .+6 
+ jmp emt04
+	cmp -14.(r1), #0
+	bne .+6 
+ jmp emt04
+	cmp -14.(r1), Player
+	bne .+6 
+ jmp emt04
+	cmp (r3), #0
+	beq Valid
+	jmp emt04
+	;--------------------------
+	;eating left
+mWlE: cmp r2, #-36
+	beq .+6
+	jmp emt04
+	cmp r5, #2.
+	bhi .+6 
+ jmp emt04
+	cmp -18.(r1), #0
+	bne .+6 
+ jmp emt04
+	cmp -14.(r1), Player
+	bne .+6 
+ jmp emt04
+	cmp (r3), #0
+	beq Valid
+	jmp emt04
+	;----------------------------
+	
+Valid:mov #Board, -(sp)
+	mov r1, -(sp)
+	mov r3, -(sp)
+	jsr r5, movPie 
+	mov (sp)+, r3
+	mov (sp)+, r1
+	
+	cmp Player, #1
+	bne .+8
+	mov #WColor, -(sp)
+	br .+6
+	mov #BColor, -(sp)
+	
+	jsr pc, print
+	tst (sp)+
+	
+	mov #humPri, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	mov #movPri1, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	cmp Player, #1
+	bne .+8
+	mov TimeW, r0
+	br .+6
+	mov TimeB, r0
+	
+	
+	
+	; calculating how many deciseconds passed
+	mov #10., r1
+	sub timerdeci, r1
+	cmp r1, #10.
+	bne .+8
+	mov #0, r1
+	br .+6
+	
+	sub #1, r0
+	sub  timersec, r0
+
+	jsr pc, printnum
+	
+	mov #dot, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	mov r1, r0
+	jsr pc, printnum
+	
+	mov #movPri2, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	jsr pc, endl
+	
+	
+	;switiching player
+	cmp Player, #1
+	beq .+12
+	mov #1, Player
+	br .+8
+	mov #2, Player
+	
+	tst (sp)+
+	mov (sp)+, r5
+	mov (sp)+, r4
+	mov (sp)+, r3
+	mov (sp)+, r2
+	mov (sp)+, r1
+	mov (sp)+, r0
+	tst (sp)+
+	rti
+
+;------------------------------------------------------
+;Time
+
+emt03: 		cmpb Buffer+8., #15 ; ascii for enter 
+beq .+16
+cmpb Buffer+8., #40 ; ascii for space
+beq .+6
+jmp emt04
+
+cmp InGame, #1
+		beq .+6
+		jmp emt04
+
+
+			clr r0
+			clr r2
+			mov timersec, r0
+			mov timerdeci,r2 ;save deci at the beggining so it won't keep going up as the function progresses
+			mov #tleft,-(sp) ;print regular opening time string
+			jsr pc,print
+			tst (sp)+
+			jsr pc,printnum ;print seconds digit
+			mov #dot,-(sp) ;print dot
+			jsr pc,print
+			tst (sp)+
+			clr r0
+			mov r2,r0 ;move decisec to r1 in order to print
+			jsr pc,printnum
+			clr r0
+			jsr pc,endl ;go down a line
+		
+mov #dollar, -(sp)
+jsr pc, print
+tst (sp)+
+
+mov (sp)+, r5
+mov (sp)+, r4
+mov (sp)+, r3
+mov (sp)+, r2
+mov (sp)+, r1
+mov (sp)+, r0
+tst (sp)+
+rti
+
+;----------------------------------------------------
+
+;Invalid Command
+
+emt04:
+	mov (sp)+, r5
+	mov (sp)+, r4
+	mov (sp)+, r3
+	mov (sp)+, r2
+	mov (sp)+, r1
+	
+	
+	mov #illeg1, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	mov #Buffer, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	mov #illeg2, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	jsr pc, endl
+	
+		
+mov #dollar, -(sp)
+jsr pc, print
+tst (sp)+
+
+	mov (sp)+, r0
+	tst (sp)+
+	rti
+
+
+;---------------------------------------------------	
+;command decipher
+emt05: cmpb Buffer, #163 ; ascii for s
+	bne isMove
+	cmpb Buffer+2, #164 ; ascii for t
+	bne emt04
+	cmpb Buffer+4, #141 ; ascii for a
+	bne isStop
+	cmpb Buffer+6, #162 ; ascii for r
+	bne emt04
+	cmpb Buffer+8., #164 ; ascii for t
+	bne emt04
+	cmpb Buffer+10., #40 ; ascii for space
+	bne emt04
+	jmp emt00
+
+isStop:	cmpb Buffer+4, #157 ;ascii for o
+	bne emt04
+	cmpb Buffer+6, #160 ; ascii for p
+	bne emt04
+	jmp emt01
+
+;is move
+isMove: cmpb Buffer, #155 ; ascii for m
+	bne isTime
+	cmpb Buffer+2, #157 ; ascii for 0
+	bne emt04
+	cmpb Buffer+4, #166 ; ascii for v
+	bne emt04
+	cmpb Buffer+6, #145 ; ascii for e
+	bne emt04
+	cmpb Buffer+8., #40 ; ascii for space
+	bne emt04
+	jmp emt02
+
+;is time	
+isTime: cmpb Buffer, #164 ;ascii for t
+	bne emt04
+	cmpb Buffer+2, #151 ; ascii for i
+	bne emt04
+	cmpb Buffer+4, #155 ;ascii for m
+	bne emt04
+	cmpb Buffer+6, #145 ;ascii for e
+	bne emt04
+	jmp emt03
+	
+	mov (sp)+, r5
+	mov (sp)+, r4
+	mov (sp)+, r3
+	mov (sp)+, r2
+	mov (sp)+, r1
+	mov (sp)+, r0
+	tst (sp)+
+	rti		
+;-------------------------------	
+
+;------------------------------------------------
+;gets the input until enter is pressed (/r), saves it into the Buffer
+echo:	cmp #15,@#TKB; check for enter
+		beq endecho
+		cmp #10,@#TKB ;check for backspace
+		beq delete
+ecloop: 	tstb @#TPS ;wait till printer is ready
+		bpl ecloop
+		mov @#TKB,TPB;print char
+		mov r1,-(sp) ;save current value of r1 in case we interrupted a funtion that uses it
+		mov Buffpoint,r1;set the adress of the pointer to r1
+		mov @#TKB,(r1);move char to buffer
+		mov (sp)+,r1
+		add #2,Buffpoint
+		bis #101,@#TKS
+		rti
+
+
+		
+		
+;will print a spce instead of the current letter, wnd will move the cursor one slot back
+delete:	mov @#TKB,@#TPB ;this will move the cursor back
+dloop:	tstb @#TPS ;wait till printer is ready
+		bpl dloop
+		mov #40,@#TPB ;print space over the char that needs to be deleted
+d2loop:	tstb @#TPS ;wait till printer is ready
+		bpl d2loop
+		mov #10,@#TPB ;take the cursor back one spot
+		sub #2,Buffpoint
+		mov r1,-(sp)
+		mov Buffpoint,r1
+		mov #0,(r1);delete the value of the current point in the buffer
+		mov (sp)+,r1
+		bis #101,@#TKS
+		rti
+		
+		
+		
+		
+		
+		
+endecho:mov r1,-(sp)
+		mov Buffpoint,r1
+		mov @#TKB,(r1) ;move the enter char to adress
+		mov (sp)+,r1
+		jsr pc,endl ;go down a line
+		mov #Buffer,Buffpoint
+		emt 05
+		bis #101,@#TKS
+		rti
+;-------------------------------
+
+
+	
+;-----------------------------------------------
+;Clock Trap
+clock:	cmp #0,timerdeci
+		beq checkend ; check if time has ended when timerdeci reached to 0
+		dec timerdeci; decrease deciseconds
+		rti
+
+
+checkend: cmp #0,timersec
+		beq endtime ;both deciseconds and seconds have reached 0, time is up
+		br secdec
+		
+		beq secdec ;10 deciseconds have passed, we need to decrease the seconds (if time didn't end)
+		rti;if deci is not 0 time is not up
+
+secdec: dec timersec
+		mov #9.,timerdeci ;reset deciseconds to 9
+		rti
+endtime: cmp Player,#1 ;check if player white
+		bne endblack;current player is black
+		cmp White+2,#0 ;check if white player is human (presented by 0)
+		bne endpc ;current player is white computer
+		mov #0,InGame ;end the game
+		mov #overwhite,-(sp) ;push print message to stack
+		jsr pc,print
+		tst (sp)+
+		clr @#CLS ;ending a game, clock can't interupt anymore
+		rti
+		
+endblack: cmp Black+2,#0
+		bne endpc
+		mov #0,InGame ;end the game
+		mov #overblack,-(sp) ;push print message to stack
+		jsr pc,print
+		tst (sp)+
+		clr @#CLS ;ending a game, clock can't interupt anymore
+		rti
+		
+
+		
+endpc:	clr @#CLS
+		rti
+
+
+;---------------------------------------
+
+ComTurn:mov #-1., Steps
+turnLoop: cmp InGame, #0 ; was a stop made during the turn
+	bne .+4
+	rts pc
+	cmp timersec, #0 
+	beq outComp
+	
+	add #2, Steps
+	
+	mov #SrcCom, -(sp)
+	mov #DstCom, -(sp)
+	mov #WPCom, -(sp)
+	jsr pc, getMaxWP
+	add #6, sp
+	
+	cmp Steps, #9. ; no need to calculate so far as 11 steps 
+	blo turnLoop
+
+outComp: mov #Board, -(sp)
+	mov SrcCom, -(sp)
+	mov DstCom, -(sp)
+	jsr r5, movPie
+	add #6., sp
+	
+	
+	;printing move text
+	jsr pc, endl
+	cmp Player, #1
+	bne .+8
+	mov #WColor, -(sp)
+	br .+6
+	mov #BColor, -(sp)
+	
+	jsr pc, print
+	tst (sp)+
+	
+	mov #compPri, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	mov #movPri1, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	cmp Player, #1
+	bne .+8
+	mov TimeW, r0
+	br .+6
+	mov TimeB, r0
+	
+	; calculating how many deciseconds passed
+	mov #10., r1
+	sub timerdeci, r1
+	cmp r1, #10.
+	bne .+8
+	mov #0, r1
+	br .+6
+	
+	sub #1, r0
+	sub  timersec, r0
+	jsr pc, printnum
+	
+	mov #dot, -(sp)
+	jsr pc, print
+	tst (sp)+
+	
+	mov r1, r0
+	jsr pc, printnum
+	
+	mov #movPri2, -(sp)
+	jsr pc, print
+	tst (sp)+	
+	
+	jsr pc, endl
+	
+	
+	;switching player
+	cmp Player, #1
+	beq .+12
+	mov #1, Player
+	br .+8
+	mov #2, Player
+	
+	rts pc
+	
+getMaxWP: ;|r1|r0|return address|WP|DST|SRC 
+	;finding a player for default value
+	mov r0, -(sp)
+	mov r1, -(sp)
+	mov #Board, r1
+	add #-2., r1
+	
+lp: add #2, r1
+	cmp (r1), Player
+	bne lp
+	
+	mov r1,@8.(sp)
+	mov r1,@10.(sp)
+	
+	mov Steps, -(sp)
+	mov r1, -(sp)
+	mov r1, -(sp)
+	mov #7777, -(sp)
+	mov Player, -(sp)
+	
+	jsr pc, MaxWP ;|Player|localWP|dst|src|steps|r1|r0|return address|WP|DST|SRC
+	mov (sp) , 4.(sp);fucntionWP|Player|localWP|dst|src|steps|r1|r0|return address|WP|DST|SRC
+	tst (sp)+
+	tst (sp)+
+	
+	;localWP|dst|src|steps|r1|r0|return address|WP|DST|SRC
+	
+	mov (sp), @14.(sp)
+	tst (sp)+
+
+	
+	;|dst|src|steps|r1|r0|return address|WP address|dst address|src address
+	mov (sp), @14.(sp)
+	tst (sp)+
+	mov (sp), @14.(sp)
+	tst (sp)+
+	tst (sp)+
+
+	mov (sp)+, r1
+	mov (sp)+, r0
+	
+	rts pc
+
+;---------------------------------------------------------
+
+MaxWP:mov r0, -(sp) ;MaxWP gets the following stack: |return address|Player|local WP|prev dst|prev src|steps
+	mov r1, -(sp)
+	mov r2, -(sp)
+	mov r3, -(sp)
+	mov r4, -(sp)
+	mov r5, -(sp)
+	;|r5|r4|r3|r2|r1|r0|return address|Player|bestMove|prevdst|prevsrc|steps
+	mov #Board, -(sp)
+	mov 16.(sp), -(sp) ;curr Player
+	jsr pc, calcWP 
+	; curr WP is now held in r4
+	tst (sp)+
+	tst (sp)+
+	mov r4, r0 ;Player WP is held in r0
+
+	cmp 14.(sp), #1
+	beq op_2
+	mov #1, r1
+	br condchk
+	op_2: mov #2, r1 ; r1 will be used to hold adversary
+
+; ----- checking ending conditions
+condchk:cmp 22.(sp), #0 ; depth ==0
+	beq endCond
+	
+	;time <= 1
+	cmp timersec, #1
+	blos endCond
+	;-----
+	cmp r0, #20 ; node = win
+	beq endConW 
+
+	mov #Board, -(sp)
+	mov r1, -(sp)
+	jsr pc, calcWP ;  Enemy WP is held in r4
+	mov (sp)+, r1
+	tst (sp)+	
+
+	cmp r4, #20 ; node = lose
+	beq endConL 	
+
+	cmp r4, #0	;WP = 0 => there might be a tie, procees to check NumMoves		
+	bne recStep
+
+	mov #Board, -(sp)
+	mov r1, -(sp) 
+	jsr pc, NumMoves
+	mov r3, r5 ;r5 will be used to hold enemy NumMoves
+	mov (sp)+, r1
+	mov 16.(sp), -(sp)
+	jsr pc, NumMoves ;r3 will be used to hold player NumMoves
+	tst (sp)+
+	tst (sp)+
+	
+	cmp r5, #0 ; checks if both players have no moves
+	bne recStep
+	cmp r3, #0
+	beq endConT
+
+	br recStep ; non of the conditions for ending have been fullfilled, proceesing to do the recursion step
+
+	;|r5|r4|r3|r2|r1|r0|return address|Player|local wp|prev dst| prev src
+	; We always return the WP of the player in the player tag
+endCond: cmp 14.(sp), Player
+		beq Cond1
+		mov r4, r0
+Cond1: mov (sp)+, r5 
+	mov (sp)+, r4
+	mov (sp)+, r3
+	mov (sp)+, r2
+	mov (sp)+, r1 
+	mov 2.(sp), -(sp)
+	mov r0, 4.(sp)
+	mov 2.(sp), r0
+	mov (sp), 2.(sp)
+	tst (sp)+
+	rts pc
+
+endConW: cmp 14.(sp), Player
+		beq Cond2
+		mov #-20., r0
+Cond2: mov (sp)+, r5 
+	mov (sp)+, r4
+	mov (sp)+, r3
+	mov (sp)+, r2
+	mov (sp)+, r1 
+	mov 2.(sp), -(sp)
+	mov r0, 4.(sp)
+	mov 2.(sp), r0
+	mov (sp), 2.(sp)
+	tst (sp)+
+	rts pc
+	
+
+endConL: cmp 14.(sp), Player
+		beq Cond3
+		mov #20, r0
+Cond3: mov (sp)+, r5 
+	mov (sp)+, r4
+	mov (sp)+, r3
+	mov (sp)+, r2
+	mov (sp)+, r1 
+	mov 2.(sp), -(sp)
+	mov r0, 4.(sp)
+	mov 2.(sp), r0
+	mov (sp), 2.(sp)
+	tst (sp)+
+	rts pc
+
+endConT: mov (sp)+, r5 
+	mov (sp)+, r4
+	mov (sp)+, r3
+	mov (sp)+, r2
+	mov (sp)+, r1 
+	mov 2.(sp), -(sp)
+	mov #0., 4.(sp)
+	mov 2.(sp), r0
+	mov (sp), 2.(sp)
+	tst (sp)+
+	rts pc
+	
+;We begin the recursion step with the WP in r0, the adversay in r1, the rest of the registers have no use for us atm
+recStep: 
+;looking for valid moves. for each move we do move piece and call the function. we then mov piece back and continue looking for moves
+	
+
+mov #Board, r3
+mov #64., r2
+add #-2., r3
+
+movFind: add #2, r3
+	cmp 14.(sp), (r3) ; finding player pieces
+	beq chkMov
+	sob r2, movFind
+	
+	mov #Board, -(sp)
+	mov 16.(sp), -(sp)
+	jsr pc, NumMoves
+	tst (sp)+
+	tst (sp)+
+	
+	; if there are no moves we wish to send the board as is and pass the turn 
+	cmp r3, #0
+	bne movfin
+	
+	mov #Board, r3
+	mov #64., r2
+	add #-2., r3 
+	;finding a piece
+pifind:	add #2, r3
+	cmp 14.(sp), (r3)
+	beq Call1
+	sob r2, pifind
+	
+Call1: mov 22.(sp), -(sp)
+	add #-1., (sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)	
+	mov r1, -(sp)
+	jsr pc, MaxWP
+	
+	;|fucntionWP|
+	mov (sp), 10.(sp)
+	add #12, sp ; popping paramters
+
+	;|function WP|r5|r4|r3|r2|r1|r0|return address|Player|local WP|prev dst|prev src|steps
+	cmp #7777, 18.(sp)
+	beq defEnd1
+	
+	;MinMaxing - if this is a player turn then we wish for the WP to be highest. if this is enemy turn then lowest
+	cmp 16.(sp), Player
+	beq minMax1
+	cmp (sp), 18.(sp)
+	bgt End1
+	mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	mov r3, 22.(sp)
+	br End1
+	
+minMax1: cmp (sp), 18.(sp)
+		ble End1
+		mov (sp), 18.(sp)
+		mov r3, 20.(sp)
+		mov r3, 22.(sp)
+		br End1
+
+defEnd1: mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #18., 20.(sp)
+	mov r3, 22.(sp)
+	
+End1:tst (sp)+
+	
+	
+	
+	; finished board, returning to prev function
+movfin:	mov (sp)+, r5
+	mov (sp)+, r4
+	mov (sp)+, r3
+	mov (sp)+, r2
+	mov (sp)+, r1
+	mov (sp)+, r0
+	mov (sp), -(sp)
+	mov 6.(sp), 2.(sp)
+	rts pc
+
+chkMov: cmp 14.(sp), #1
+		bne chkBr ;apparently chkWr is too far for beq, so we use jmp
+		jmp chkWr
+
+chkBr:	mov r3, r5
+		sub #Board, r5
+		cmp r5, #112.
+		bhis movFind ;piece is on the last row and cannot move anyways
+		clr r4
+		div #20, r4
+		cmp #14., r5 ;the piece is on a corner and cannot move right
+		bne contchk
+		jmp chkBl
+contchk:mov 18.(r3), r4
+		cmp #0, r4
+		bne blokBr ; the tile to the right is blocked.
+		
+		; tile is free, we can perform a move
+		; src is in r3, dst is 18.(r3)
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		mov r3, -(sp)
+		add #18., (sp)
+		
+		jsr r5,  movPie ;doing the move
+		
+		add #6., sp ; popping parameters
+		
+		;calling the function again
+Call2: mov 22.(sp), -(sp)
+	add #-1., (sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)	
+	mov r1, -(sp)
+	jsr pc, MaxWP
+		
+		;restoring board
+	mov #Board, -(sp)
+	mov r3, -(sp)
+	add #18., (sp)
+	mov r3, -(sp)
+		
+	jsr r5,  movPie
+		
+	add #6., sp
+	
+	;|fucntionWP|
+	mov (sp), 10.(sp)
+	add #12, sp ; popping paramters
+
+	;|function WP|r5|r4|r3|r2|r1|r0|return address|Player|local WP|prev dst|prev src|steps
+	cmp #7777, 18.(sp)
+	beq defEnd2
+	
+	;MinMaxing - if this is a player turn then we wish for the WP to be highest. if this is enemy turn then lowest
+	cmp 16.(sp), Player
+	beq minMax2
+	cmp (sp), 18.(sp)
+	bgt End2
+	mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #18., 20.(sp)
+	mov r3, 22.(sp)
+	br End2
+	
+minMax2: cmp (sp), 18.(sp)
+		ble End2
+		mov (sp), 18.(sp)
+		mov r3, 20.(sp)
+		add #18., 20.(sp)
+		mov r3, 22.(sp)
+		br End2
+
+defEnd2: mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #18., 20.(sp)
+	mov r3, 22.(sp)
+	
+End2:tst (sp)+
+	br chkBl
+		
+blokBr: cmp 14.(sp), r4
+		beq chkBl ;piece is blocked to the right by a piece of the same color, so a move cannot be done
+		cmp #12., r5 ; checking to see that the blocking piece isn't on a corner
+		beq chkBl
+		mov 36.(r3), r4 ;checking to see if the tile after the blocking piece is free
+		cmp #0, r4
+		bne chkBl
+		;the tile is free, we can perform a move
+		; src is in r3, dst is 36.(r3)
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		mov r3, -(sp)
+		add #36., (sp)
+		
+		jsr r5,  movPie ;doing the move
+		
+		add #6., sp ; popping paramters
+		
+		;calling the function again
+
+Call3:	mov 22.(sp), -(sp)
+	add #-1., (sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)	
+	mov r1, -(sp)
+	jsr pc, MaxWP
+	
+		;restoring board
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		add #36., (sp)
+		mov r3, -(sp)
+		
+		jsr r5,  movPie
+		
+		add #6., sp
+	
+	mov (sp), 10.(sp)
+	add #12, sp ; popping paramters
+	
+	;|function WP|r5|r4|r3|r2|r1|r0|return address|Player|local WP|prev dst|prev src|steps
+	cmp #7777, 18.(sp)
+	beq defEnd3
+	
+	;MinMaxing - if this is a player turn then we wish for the WP to be highest. if this is enemy turn then lowest
+	cmp 16.(sp), Player
+	beq minMax3
+	cmp (sp), 18.(sp)
+	bgt End3
+	mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #36., 20.(sp)
+	mov r3, 22.(sp)
+	br End3
+	
+minMax3: cmp (sp), 18.(sp)
+		ble End3
+		mov (sp), 18.(sp)
+		mov r3, 20.(sp)
+		add #36., 20.(sp)
+		mov r3, 22.(sp)
+		br End3
+
+defEnd3: mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #36., 20.(sp)
+	mov r3, 22.(sp)
+	
+End3:tst (sp)+
+	br chkBl
+		
+chkBl: cmp #0, r5 ;checking to see that the piece isn't on the left corner
+		bne contbl
+		jmp movFind
+contbl:	mov 14.(r3), r4
+		cmp #0, r4
+		bne blokBl ; the tile to the left is blocked
+		; tile is free, we can perform a move
+		; src is in r3, dst is 14.(r3)
+		
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		mov r3, -(sp)
+		add #14., (sp)
+		
+		jsr r5,  movPie ;doing the move
+		
+		add #6., sp ; popping parameters
+		
+		; calling the function again
+		
+Call4:	mov 22.(sp), -(sp)
+	add #-1., (sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)	
+	mov r1, -(sp)
+	jsr pc, MaxWP
+	
+		;restoring board
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		add #14., (sp)
+		mov r3, -(sp)
+		
+		jsr r5,  movPie
+		
+		add #6., sp
+	
+	mov (sp), 10.(sp)
+	add #12, sp ; popping paramters
+	
+	cmp #7777, 18.(sp)
+	beq defEnd4
+	
+	;MinMaxing - if this is a player turn then we wish for the WP to be highest. if this is enemy turn then lowest
+	cmp 16.(sp), Player
+	beq minMax4
+	cmp (sp), 18.(sp)
+	bgt End4
+	mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #14., 20.(sp)
+	mov r3, 22.(sp)
+	br End4
+	
+minMax4: cmp (sp), 18.(sp)
+		ble End4
+		mov (sp), 18.(sp)
+		mov r3, 20.(sp)
+		add #14., 20.(sp)
+		mov r3, 22.(sp)
+		br End4
+
+defEnd4: mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #14., 20.(sp)
+	mov r3, 22.(sp)
+	
+End4:tst (sp)+		
+		jmp movFind
+		
+blokBl: cmp 14.(sp), r4
+		bne .+6
+		jmp movFind
+		cmp #2, r5
+		bne .+6
+		jmp movFind
+		mov 28.(r3), r4
+		cmp #0, r4 
+		beq .+6
+		jmp movFind; the tile after the tile to the left is blocked
+		;tile is free, we can perform a move
+		; src is in r3, dst is 28.(r3)
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		mov r3, -(sp)
+		add #28., (sp)
+		
+		jsr r5,  movPie ;doing the move
+		
+		add #6., sp ; popping paramters
+		
+		;calling the function again
+		
+Call5:	mov 22.(sp), -(sp)
+	add #-1., (sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)	
+	mov r1, -(sp)
+	jsr pc, MaxWP
+	
+		;restoring board
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		add #28., (sp)
+		mov r3, -(sp)
+		
+		jsr r5,  movPie
+		
+		add #6., sp
+	
+	mov (sp), 10.(sp)
+	add #12, sp ; popping paramters
+
+	cmp #7777, 18.(sp)
+	beq defEnd5
+	
+	;MinMaxing - if this is a player turn then we wish for the WP to be highest. if this is enemy turn then lowest
+	cmp 16.(sp), Player
+	beq minMax5
+	cmp (sp), 18.(sp)
+	bgt End5
+	mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #28., 20.(sp)
+	mov r3, 22.(sp)
+	br End5
+	
+minMax5: cmp (sp), 18.(sp)
+		ble End5
+		mov (sp), 18.(sp)
+		mov r3, 20.(sp)
+		add #28., 20.(sp)
+		mov r3, 22.(sp)
+		br End5
+
+defEnd5: mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #28., 20.(sp)
+	mov r3, 22.(sp)
+	
+End5:tst (sp)+				
+		jmp movFind
+
+chkWr: mov r3, r5
+		sub #Board, r5
+		cmp r5, #14.
+		bhi .+6 ;piece is on the first row and cannot move further anyways
+		jmp movFind
+		clr r4
+		div #20, r4
+		cmp #14., r5 ;the piece is on a corner and cannot move right
+		bne .+6
+		jmp chkWl
+		mov -14.(r3), r4
+		cmp #0, r4
+		bne blokWr
+		;tile is free, a move can be made src is r3, dst is -14.(r3)
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		mov r3, -(sp)
+		add #-14., (sp)
+		
+		jsr r5,  movPie ;doing the move
+		
+		add #6., sp ; popping paramters
+		
+		;calling the function again
+
+Call6:	mov 22.(sp), -(sp)
+	add #-1., (sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)	
+	mov r1, -(sp)
+	jsr pc, MaxWP	
+		
+		;restoring board
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		add #-14., (sp)
+		mov r3, -(sp)
+		
+		jsr r5,  movPie
+		
+		add #6., sp
+	
+	mov (sp), 10.(sp)
+	add #12, sp ; popping paramters
+	
+	cmp #7777, 18.(sp)
+	beq defEnd6
+	
+	;MinMaxing - if this is a player turn then we wish for the WP to be highest. if this is enemy turn then lowest
+	cmp 16.(sp), Player
+	beq minMax6
+	cmp (sp), 18.(sp)
+	bgt End6
+	mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #-14., 20.(sp)
+	mov r3, 22.(sp)
+	br End6
+	
+minMax6: cmp (sp), 18.(sp)
+		ble End6
+		mov (sp), 18.(sp)
+		mov r3, 20.(sp)
+		add #-14., 20.(sp)
+		mov r3, 22.(sp)
+		br End6
+
+defEnd6: mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #-14., 20.(sp)
+	mov r3, 22.(sp)
+		
+End6:tst (sp)+				
+		jmp chkWl	
+		
+blokWr: cmp 14.(sp), r4
+		beq chkWl ; piece is blocked by a piece of the same color
+		cmp r5, #12.
+		beq chkWl ; the blocking tile is on a corner
+		mov -28.(r3), r4
+		cmp #0, r4
+		bne chkWl ;the tile afterwards is blocked
+		; tile is free, a move can be done. src is r3, dst is -28.(r3)
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		mov r3, -(sp)
+		add #-28., (sp)
+		
+		jsr r5,  movPie ;doing the move
+		
+		add #6., sp ; popping paramters
+		
+		;calling the function again
+Call7: mov 22.(sp), -(sp)
+	add #-1., (sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)	
+	mov r1, -(sp)
+	jsr pc, MaxWP
+		
+		;restoring board
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		add #-28., (sp)
+		mov r3, -(sp)
+		
+		jsr r5,  movPie
+		
+		add #6., sp
+	
+	mov (sp), 10.(sp)
+	add #12, sp ; popping paramters
+	
+	cmp #7777, 18.(sp)
+	beq defEnd7
+	
+;MinMaxing - if this is a player turn then we wish for the WP to be highest. if this is enemy turn then lowest
+	cmp 16.(sp), Player
+	beq minMax7
+	cmp (sp), 18.(sp)
+	bgt End7
+	mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #-28., 20.(sp)
+	mov r3, 22.(sp)
+	br End7
+	
+minMax7: cmp (sp), 18.(sp)
+		ble End7
+		mov (sp), 18.(sp)
+		mov r3, 20.(sp)
+		add #-28., 20.(sp)
+		mov r3, 22.(sp)
+		br End7
+
+defEnd7: mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #-28., 20.(sp)
+	mov r3, 22.(sp)
+	
+End7:tst (sp)+
+		br chkWl
+
+chkWl: cmp #0, r5 ; the piece is on the left corner
+		bne .+6
+		jmp movFind
+		mov -18.(r3), r4
+		cmp #0, r4
+		bne blokWl ; tile is blocked
+		; tile is free, a move can be made. src is r3, dst is -18.(r3)
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		mov r3, -(sp)
+		add #-18., (sp)
+		
+		jsr r5,  movPie ;doing the move
+		
+		add #6., sp ; popping paramters
+		
+		;calling the function again
+		
+Call8: mov 22.(sp), -(sp)
+	add #-1., (sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)	
+	mov r1, -(sp)
+	jsr pc, MaxWP 
+	
+		;restoring board
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		add #-18., (sp)
+		mov r3, -(sp)
+		
+		jsr r5,  movPie
+		
+		add #6., sp
+	
+	mov (sp), 10.(sp)
+	add #12, sp ; popping paramters
+
+	cmp #7777, 18.(sp)
+	beq defEnd8
+;MinMaxing - if this is a player turn then we wish for the WP to be highest. if this is enemy turn then lowest
+	cmp 16.(sp), Player
+	beq minMax8
+	cmp (sp), 18.(sp)
+	bgt End8
+	mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #-18., 20.(sp)
+	mov r3, 22.(sp)
+	br End8
+	
+minMax8: cmp (sp), 18.(sp)
+		ble End8
+		mov (sp), 18.(sp)
+		mov r3, 20.(sp)
+		add #-18., 20.(sp)
+		mov r3, 22.(sp)
+		br End8
+
+defEnd8: mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #-18., 20.(sp)
+	mov r3, 22.(sp)
+	
+End8:tst (sp)+
+		jmp movFind
+
+blokWl: cmp 14.(sp), r4 ; the blocking piece is in the same color
+		bne .+6
+		jmp movFind
+		cmp #2, r5 ; the blocking piece is on a corner
+		bne .+6
+		jmp movFind
+		mov -36.(r3), r4
+		cmp #0, r4
+		beq .+6
+		jmp movFind
+		; tile afterwards is free, src is r3, dst is -36.(r3)
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		mov r3, -(sp)
+		add #-36., (sp)
+		
+		jsr r5,  movPie ;doing the move
+		
+		add #6., sp ; popping paramters
+		
+		
+		;calling the function again
+Call9:	mov 22.(sp), -(sp)
+	add #-1., (sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)
+	mov 22.(sp), -(sp)	
+	mov r1, -(sp)
+	jsr pc, MaxWP 
+	
+		;restoring board
+		mov #Board, -(sp)
+		mov r3, -(sp)
+		add #-36., (sp)
+		mov r3, -(sp)
+		
+		jsr r5,  movPie
+		
+		add #6., sp
+	
+	mov (sp), 10.(sp)
+	add #12, sp ; popping paramters
+	
+	cmp #7777, 18.(sp)
+	beq defEnd9
+	
+;MinMaxing - if this is a player turn then we wish for the WP to be highest. if this is enemy turn then lowest
+	cmp 16.(sp), Player
+	beq minMax9
+	cmp (sp), 18.(sp)
+	bgt End9
+	mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #-36., 20.(sp)
+	mov r3, 22.(sp)
+	br End9
+	
+minMax9: cmp (sp), 18.(sp)
+		ble End9
+		mov (sp), 18.(sp)
+		mov r3, 20.(sp)
+		add #-36., 20.(sp)
+		mov r3, 22.(sp)
+		br End9
+
+defEnd9: mov (sp), 18.(sp)
+	mov r3, 20.(sp)
+	add #-36., 20.(sp)
+	mov r3, 22.(sp)
+	
+End9:tst (sp)+
+		jmp  movFind
+		
+
+
+;--------------------------------------------------------------------------
+;calcWp - calculates the winning paramter for a given player and board. 
+calcWP:; going over the board, if the value is equal to that in player, we inc r4. if it is equal to that of adversary we inc r1.
+		; we then put the res of subtraction in r4
+		; r0 = index
+		; r1 = num of enemy
+		mov 4(sp), -(sp)
+		mov 4(sp), -(sp)
+		jsr pc, checkWin ; we want to check if this is a win and if so the WP will be 20
+		
+		mov r5, -(sp) ; saving r5 since we are about to change it
+		mov 2.(sp), r5 
+		mul #20, r5 ;if this is a win r5*20 = 20
+		mov r5, r4
+		mov (sp)+, r5 ; popping r5 back
+		tst (sp)+ ; popping the res of check win since we don't need it
+		tst (sp)+ ;popping parameters
+		tst (sp)+
+		
+		cmp r4, #20
+		beq WPEnd
+		
+notWin:	mov r0, -(sp)
+		mov r1, -(sp)
+		mov r2, -(sp)
+		mov r3, -(sp)
+		
+		;stack looks like this: |r3|r2|r1|r0|pc|player|board
+		clr r1
+		clr r4
+		mov #64., r0
+		mov 12.(sp), r2
+		cmp 10.(sp), #1
+		beq .+8
+		mov #1, r3
+		br WPloop1		
+		mov #2, r3
+
+WPloop1:add #-2, r2 ;r0 is index, r1 used to store enemy number of pieces, r2 is the advancment on the board, r3 is opponent color
+					;r4 is used to store player number of pieces
+
+WPloop: add #2, r2 ;going over the board we count how many pieces of player and opponent there are
+		cmp (r2), r3
+		bne .+4
+		inc r1
+		cmp (r2), 10.(sp)
+		bne eloop
+		inc r4
+
+eloop:	sob r0, WPloop	
+		sub r1, r4
+		mov (sp)+, r3
+		mov (sp)+, r2
+		mov (sp)+, r1
+		mov (sp)+, r0
+WPEnd:	rts pc
+
+
+
+
+;checkWin -  Check if the board is in a winning position for the player in the stack
+
+	
+checkWin: mov r0,-(sp) 	; backUp r0. Used for the piece place at the board.
+		mov r1, -(sp) 	; backUp r1. Used to count in the loop.
+		mov r2, -(sp) 	; backUp r2. Used for the opponent color.
+		mov r3, -(sp)   ; backUp r3. Used for the NumMoves of the opponent.
+		mov r4, -(sp)   ; backUp r4. Used for the NumMoves of the player.
+		
+		mov 14.(sp), r0	; Put the place of the board in r0.
+		mov 12.(sp), r2 	; Put the current player in r2.
+		mov #64., r1 ; r1 will be used as an index
+		clr r3
+		clr r4
+		add #-2. , r0
+		
+		cmp #1, r2		; Get to color of the opponent.
+		beq .+8
+		mov #1, r2 ; The opponent is 1
+		br .+6
+		mov #2, r2 ; The opponent is 2
+							
+		mov r0, -(sp) ; moves the board to stack
+		mov 14.(sp), -(sp) ;moves the player to stack
+		jsr pc, NumMoves
+		mov r3, r4 
+		tst (sp)+ ; pop player
+		
+		mov r2, -(sp) ;push opponent
+		jsr pc, NumMoves ; check NumMoves for opponent
+		tst (sp)+
+		tst (sp)+
+		cmp r3, #0 ;checks if both players have no moves
+		bne pieceOp
+		cmp r4, r3
+		bne pieceOp
+		mov #1, r4 ;r4 holds 1 if the number of moves for both players is 0.
+
+pieceOp: clr r3; r3 will be used to hold the number of pieces the opponent has
+pieceOp1: add #2, r0 
+		cmp r2, (r0)
+		bne opLoop
+		inc r3
+opLoop: sob r1, pieceOp1	
+
+mov 14.(sp), r0 ; restoring r0 to the start of the board
+mov #64., r1
+clr r2 ; we no longer need info about the opp color, we'll be using this register to count the player pieces		
+add #-2. , r0		
+piecePl: add #2, r0 
+		cmp 12.(sp), (r0)
+		bne .+4
+		inc r2
+		sob r1, piecePl
+
+		cmp #0, r3 ;if the opponent has no pieces this is a win
+		beq Win
+		cmp r3, r2 ;else, we check if the opponent has less pieces
+		bhis Loss
+		cmp r4, #1 ; if so, we check if both players have no moves, then it's also a win
+		beq Win
+		
+		
+Loss: mov (sp)+, r4
+	mov (sp)+, r3
+	mov (sp)+, r2
+	mov (sp)+, r1
+	mov (sp)+, r0
+	mov (sp), -(sp)
+	mov #-1., 2(sp)
+	rts pc
+	
+Win:mov (sp)+, r4
+	mov (sp)+, r3
+	mov (sp)+, r2
+	mov (sp)+, r1
+	mov (sp)+, r0
+	mov (sp), -(sp)
+	mov #1., 2(sp)
+	rts pc
+
+
+
+;NumMoves - the exact same function from HW 2, only it gets its paramters in stack and return NumMoves in r3	
+NumMoves:  mov r0, -(sp)
+			mov r1, -(sp)
+			mov r2, -(sp)
+			mov r4, -(sp)
+			mov r5, -(sp)
+			mov #0, -(sp)
+			
+			;|0|r5|r4|r2|r1|r0|return address|14.(sp)|16.(sp)
+		
+		mov 16.(sp), r1
+		mov r1, r0
+		add #200, r0
+		cmp 14.(sp), #1 ;move to the correct section of the code according to 14.(sp)
+		beq WhiteS
+
+
+Black:	mov r0, r3
+		sub #20, r3 ;r3 has the value of the start of the last row
+		cmp r1, r3
+		bne Bfind
+		jmp numEnd 
+		
+Bfind:	cmp 14.(sp), (r1)+
+		bne Black
+		sub #20, r3
+		;at the end of this loop, r1 points at the tile after the correct piece
+	
+	; checks the right diagonal
+Bright: clr r4
+		mov r1, r5
+		sub 16.(sp), r5
+		div #20, r4
+		cmp #0, r5
+		beq Bleft
+		;check if the tile is in the 1st or 8th column
+		mov 20(r1), r2 
+		;moves the adress of the the tile down to the right
+		cmp #0 , r2
+		bne BrBlock ;the tile is not empty
+		inc (sp) ; tile is empty, inc (sp)
+		jmp Bleft
+	
+	;if right diagonal is blocked by another piece
+BrBlock: 	cmp r1, r3
+			bhi Bleft
+			;the blockage is on the last row
+			cmp 14.(sp), r2; 
+			beq Bleft ;the tile  is blocked by a piece of the same color
+			clr r4
+			add #22, r5 ;r5 is already r1 from previous check
+			sub 16.(sp), r5
+			div #20, r4
+			cmp #0, r5
+			beq Bleft
+			;check if the tile is in the 1st or 8th column
+			cmp #0, 42(r1) 
+			bne Bleft 
+			inc (sp) ;tile is blocked by a piece of the opposite color and the tile after is free
+			jmp Bleft
+	
+	;checks the left diagonal
+Bleft: clr r4
+		mov r1, r5
+		sub 16.(sp), r5
+		div #20, r4
+		cmp #2, r5
+		beq Black
+		;check if the tile is in the 1st or 8th column
+		mov 14(r1), r2
+		cmp #0, r2
+		bne BlBlock ;the tile is not empty
+		inc (sp) ; tile is empty, inc (sp)
+		jmp Black
+
+BlBlock: 	cmp r1, r3
+			bhi Black ; the blockage is on the last row 
+			mov 32(r1), r2
+			cmp 14.(sp), r2; 
+			beq Bfind ;the tile  is blocked by a piece of the same color
+			clr r4
+			add #34, r5 ;r5 is already r1
+			sub 16.(sp), r5
+			div #20, r4
+			cmp #0, r5
+			beq Black
+			;check if the tile is in the 1st or 8th column
+			cmp #0, r2
+			bne Black
+			inc (sp)
+			jmp Black
+			
+
+WhiteS: add #20, r1 ;we are now checking the board from the second line to the end
+White:	
+		cmp r0, r1 ;this loop goes on until we have finished the board
+		bne Wfind
+		jmp numEnd
+
+Wfind: cmp 14.(sp), (r1)+	
+		bne White
+		; at the end of this loop r1 points to the tile after the piece we are checking
+		
+		;the comments for this section are exactly the same as in black
+
+Wright: clr r4
+		mov r1, r5
+		sub 16.(sp), r5
+		div #20, r4
+		cmp #0, r5
+		beq Wleft
+		;check if the tile is in the 1st or 8th column
+		mov -20(r1), r2
+		cmp #0, r2
+		bne WrBlock
+		inc (sp)
+		jmp Wleft
+
+WrBlock: cmp  r1,-70(r0)
+		blos White
+		cmp 14.(sp), r2
+		beq Wleft
+		clr r4
+		add #-20, r5 ;r5 is already r1
+		sub 16.(sp), r5
+		div #20, r4
+		cmp #16, r5
+		beq Wleft
+		;check if the tile is in the 1st or 8th column
+		cmp #0 ,-36(r1)
+		bne Wleft
+		inc (sp)
+		jmp Wleft
+
+
+Wleft: clr r4
+		mov r1, r5
+		sub 16.(sp), r5
+		div #20, r4
+		cmp #2, r5
+		beq White
+		;check if the tile is in the 1st or 8th column
+		mov -24(r1), r2
+		cmp #0, r2
+		bne WlBlock
+		inc (sp)
+		jmp White
+
+WlBlock: cmp  r1,-70(r0)
+		blos White
+		cmp 14.(sp), r2
+		beq White
+		clr r4
+		add #-24, r5 ;r5 is already r1
+		sub 16.(sp), r5
+		div #20, r4
+		cmp #0, r5
+		beq White
+		;check if the tile is in the 1st or 8th column
+		cmp #0 ,-46(r1)
+		bne White
+		inc (sp)
+		jmp White
+	
+	
+numEnd: mov (sp)+, r3
+		mov (sp)+, r5
+		mov (sp)+, r4
+		mov (sp)+, r2
+		mov (sp)+, r1
+		mov (sp)+, r0
+		rts pc
+
+;  movPie - just like movePiece only paramters are in stack, and the paramters aren't the tile number but the tile address
+; the movPie function gets its parameters in stack. source is in 4(sp), dst is in 2(sp), r5 is in (sp) and return address is in r5
+;and the content needed to return to r5 is in the stack 
+;this function assumes its input is valid. meaning no corners, moving two slots is necessiraly eating etc.
+
+;prologue
+movPie: mov r0, -(sp)
+mov r1, -(sp)
+mov r2, -(sp)
+mov r3, -(sp)
+
+;|r3|r2|r1|r0|r5|dst|src|board
+mov 12.(sp), r0
+mov 10.(sp), r1
+; so now source address is in r0, dst address is in r1, and the return address is in r5
+; stack looks as follows: r3|r2|r1 | r0| r5| board|
+
+
+mov r1, r2
+sub r0, r2
+; r2 contains the difference between the source and dst
+mov r2, r3
+sxt r2
+div #20., r2
+mov r2, r3
+;if this is not eating ,the maximum distance from src to dst can be 18 slots.
+; in order to check if this is a regular move or eat we divide r2 by 30. if it isn't less than 1, we know this is eating
+
+mov r1, r2
+sub r0, r2
+bhi pl2h
+cmp r2, #0
+beq mopEnd 
+
+ph2l: ; if moving from higher to lower address
+	; if black than this is checking a move
+	; if white then we are restoring
+	mov (r0), (r1)
+	cmp (r0), #2
+	beq pwRe
+	clr (r0)
+	cmp r3, #0
+	bne ph2lE
+	br mopEnd
+	
+ph2lE:;calculation for eaten slot: (src+dst)/2 
+	mov r1, r3
+	add r0, r3
+	sxt r2
+	div #2, r2
+	clr (r2)	; clearing the eaten piece
+	br mopEnd
+	
+pwRe:clr (r0)
+	cmp r3, #0
+	bne pwReE
+	br mopEnd
+
+pwReE: mov r1, r3
+	add r0, r3
+	sxt r2
+	div #2, r2
+	mov #1, (r2) ; restoring the black piece
+	br mopEnd
+
+pl2h:; if moving from lower to higher
+	; if black than this is restoring
+	; if white then this is checking a move
+	mov (r0), (r1)
+	cmp (r0), #1
+	beq pbRe
+	clr (r0)
+	cmp r3, #0
+	bne pl2hE
+	br mopEnd
+	
+pl2hE: ;calculation for eaten slot: (src+dst)/2
+	mov r1, r3
+	add r0, r3
+	sxt r2
+	div #2, r2
+	clr (r2) ; clearing the eaten piece
+	br mopEnd
+
+pbRe:clr (r0)
+	cmp r3, #0
+	bne pbReE
+	br mopEnd
+
+pbReE: mov r1, r3
+	add r0, r3
+	sxt r2
+	div #2, r2
+	mov #2, (r2) ; restoring the white piece
+	br mopEnd
+
+mopEnd: mov (sp)+, r3
+		mov (sp)+, r2
+		mov (sp)+, r1
+		mov (sp)+, r0 
+		rts r5 
+		
+
+;print functions
+;gets a number in r0, divides it by 10 enough times to seperate each digit and then prints the digits be reverse order
+printnum: mov #100, @#TKS	;turning off keyboard interrupts while printing
+			mov r1,-(sp) ;save the old value of r1 in the stack
+			mov #0,-(sp) ;0 in the stack will be our stopping point for printing digits.
+			cmp r0,#0 ;check if the number is negative
+			bge numloop
+			neg r0 ;turn the number to a positive
+			mov #minus,-(sp)
+			jsr pc,print
+			tst (sp)+
+numloop:	mov r0,r1
+			clr r0 ;r0 holds the quotient
+			div #10.,r0 ;get the current lsb digit (quotient in r0, remainder in r1)
+			cmp #0,r0
+			beq goprint ;once r0 is 0 it means we've seperated each digit we from the number (but maybe one, well check that)
+			add #60,r1 ;in order to get the right ascii value of the number
+			mov r1,-(sp) ;push the digit to the stack (biggest digit will end up on the top)
+			br numloop
+goprint:	add #60,r1
+			mov r1,-(sp)			
+g2print:	clr r0 ;now r0 will be used to hold the ascii code of the current digit we want to print
+			
+bwaitnum:	tstb @#TPS ;test printer ready bit
+			bpl bwaitnum ;wait until printer is ready
+			mov (sp)+,r0 ;put the current digit into r0, and pop it of of the stack
+			movb r0,@#TPB ;print digit
+			cmp #0,(sp)
+			beq endnum
+			br bwaitnum
+endnum: 	tst (sp)+
+			mov (sp)+,r1 ;bring back r1 to it's old value 
+			bis #101, @#TKS
+			mov #Buffer, Buffpoint
+			rts pc
+
+;gets an adress of a string in the stack (2(sp)), and prints each letter in a loop, till it reaches it's end (presented by 0)
+;will be used to print the known-ahead strings in the program
+print: 		mov #100, @#TKS	;turning off keyboard interrupts while printing
+			tstb @#TPS ;test printer ready bit
+			bpl print ;wait until printer is ready
+			cmpb #15, @2(sp);test if current letter is cr
+			beq end_print ;it the current letter is enter it means we've reached the end of the string
+			movb @2(sp),@#TPB ;pass the current letter to the printer
+			inc 2(sp) ;increase the string adress by one, in order to move to the next letter
+			br print ;go to print the next letter
+			
+end_print: mov #Buffer, Buffpoint 
+		bis #101, @#TKS
+		rts pc
+
+
+;start a new line
+endl:		mov #100, @#TKS	;turning off keyboard interrupts while printing
+			tstb @#TPS ;test printer ready bit
+			bpl endl
+			movb #cr,@#TPB ;carriage return
+endl2:		tstb @#TPS
+			bpl endl2
+			movb #lf,@#TPB ;line feed
+			mov #Buffer, Buffpoint
+			bis #101, @#TKS
+			rts pc
+			
+printboard: mov #100, @#TKS	;turning off keyboard interrupts while printing
+			clr r1
+			clr r2 ;r2 will be used to count till 8 for us to know we need to go down a line
+			mov #64.,r3 ;r3 will be used to count down from 63, to print only the board and end the function
+			mov #Board,r1 ;set r1 to the board adress
+boardloop:	tstb @#TPS ;test printer ready bit
+			bpl boardloop ;wait until printer is ready
+			cmp #0,(r1)
+			beq empty ;current sqaure is empty
+			cmp #1,(r1)
+			beq printwhite ;1 presents white
+			br printblack ;if we got here it means we need to print a black square
+printcon:	inc r2
+			cmp #8.,r2
+			beq boardline ;we've printed an entire row
+con2:		tst (r1)+ ;forword r1 adress to the next square
+			sob r3,boardloop ;keep printing the board until r3 reaches 0
+			clr r1
+			mov #Buffer, Buffpoint
+			bis #101, @#TKS
+			rts pc ;if we got here it means we've printed the entire board.
+			
+			
+			
+boardline:	jsr pc,endl
+			clr r2 ;set to column count to 0 zero in order to keep counting the next line limits
+			br con2 ;keep thr printing function going		
+empty: 		mov #'_,@#TPB
+			br printcon
+printwhite:	mov #'W,@#TPB
+			br printcon
+printblack:	mov #'B,@#TPB
+			br printcon
+
+;---------------------------------------------------------------------------------------
+	
+
+deBoard:.word 0, 2, 0, 2, 0, 2, 0, 2
+.word 2, 0, 2, 0, 2, 0, 2, 0
+.word 0, 2, 0, 2, 0, 2, 0, 2
+.word 0, 0, 0, 0, 0, 0, 0, 0
+.word 0, 0, 0, 0, 0, 0, 0, 0
+.word 1, 0, 1, 0, 1, 0, 1, 0
+.word 0, 1, 0, 1, 0, 1, 0, 1
+.word 1, 0, 1, 0, 1, 0, 1, 0
+
+Board: .word 0, 0, 0, 0, 0, 0, 0, 0
+.word 2, 0, 2, 0, 2, 0, 2, 0
+.word 0, 2, 0, 2, 0, 2, 0, 2
+.word 0, 0, 0, 0, 0, 0, 0, 0
+.word 0, 0, 0, 0, 0, 0, 0, 0
+.word 1, 0, 1, 0, 1, 0, 1, 0
+.word 0, 1, 0, 1, 0, 1, 0, 1
+.word 1, 0, 1, 0, 1, 0, 1, 0
+
+Player: .word 1
+
+Buffer: .blkw 50
+Buffpoint: .word Buffer
+
+WhiteP:  .word 1 
+.blkw 1 
+BlackP:  .word 2 
+.blkw 1 
+TimeW: .blkw 1
+TimeB: .blkw 1
+InGame: .word 0
+
+SrcCom: .blkw 1
+DstCom: .blkw 1
+WPCom: .blkw 1
+Steps: .blkw 1 
+
+timerdeci: .blkw 1
+timersec: 	.blkw 1	
+dot: .ascii <.\r>
+tleft: .ascii <Time left: \r>
+
+
+stopwwp:	.ascii <WP for \r>
+wis:		.ascii <white player is \r>
+blis:		.ascii <black player is \r>
+whitewin:	.ascii <White player wins!\r>
+blackwin:	.ascii <Black player wins!\r>
+printie:	.ascii <It's a tie! Game over.\r>
+illeg1: .ascii <Cannot execute "\r>
+illeg2: .ascii <" .\r>
+
+overwhite: .ascii <White Human is out of time. Game Over.\r>
+overblack: .ascii <Black Human is out of time. Game Over.\r>
+
+BColor: .ascii <Black \r>
+WColor: .ascii <White \r>
+movPri1: .ascii <move took \r>
+movPri2: .ascii < seconds.\r>
+compPri: .ascii <Computer \r>
+humPri: .ascii <Human \r>
+
+staPri: .ascii <Starting a new game \r>
+staPri1: .ascii <player is \r>
+staPri2: .ascii <with \r>
+staPri3 : .ascii < seconds per move \r>
+
+welcome : .ascii <Welcome to 208950238 and 312574502 checkers game! \r>
+currPri : .ascii <Current Player: \r>
+
+dollar: .ascii <$ \r>
+minus: .ascii <-\r>
+.even
+rate: .word 100
